@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>贪吃蛇 Roguelike - 王文昊</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #1a1a2e;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      color: #eee;
+      overflow-x: hidden;
+    }
+    h1 { font-size: 1.5rem; color: #00d4aa; margin-bottom: 8px; text-shadow: 0 0 10px rgba(0,212,170,0.5); letter-spacing: 1px; }
+    .game-wrapper {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ===== STATUS PANEL (below canvas) ===== */
+    .status-panel {
+      width: 100%; max-width: 420px;
+      background: rgba(15,25,50,0.9); border: 1px solid rgba(0,212,170,0.2);
+      border-radius: 8px; padding: 8px 10px; font-size: 0.72rem; color: #aaa;
+      margin-top: 6px;
+    }
+    .status-panel h3 { font-size: 0.72rem; color: #00d4aa; margin-bottom: 4px; font-weight: 600; }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 2px; align-items: center; }
+    .stat-row .label { color: #888; }
+    .stat-row .value { color: #eee; font-weight: 600; }
+    .stat-row .value.accent { color: #00d4aa; }
+    .stat-row .value.gold { color: #ffd700; }
+    .stat-row .value.red { color: #ff6b6b; }
+    .stat-divider { border: none; border-top: 1px solid rgba(0,212,170,0.1); margin: 4px 0; }
+    .stats-row { display: flex; flex-wrap: wrap; gap: 0 14px; }
+    .stats-row .stat-row { margin-bottom: 1px; }
+    .buffs-section { margin-top: 3px; }
+    .buffs-section h4 { font-size: 0.65rem; color: #888; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px; }
+    .buff-list { display: flex; flex-wrap: wrap; gap: 2px; }
+    .buff-tag {
+      font-size: 0.65rem; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.25);
+      border-radius: 3px; padding: 1px 4px; display: flex; align-items: center; gap: 2px;
+      color: #00d4aa;
+    }
+    .buff-tag .cnt { color: #ffd700; font-size: 0.65rem; font-weight: bold; }
+    .effect-tag {
+      font-size: 0.65rem; background: rgba(135,206,235,0.1); border: 1px solid rgba(135,206,235,0.25);
+      border-radius: 3px; padding: 1px 4px; display: flex; align-items: center; gap: 2px;
+      color: #87ceeb;
+    }
+    .effect-tag .cnt { color: #87ceeb; font-size: 0.6rem; font-weight: bold; }
+    .no-buffs { color: #555; font-size: 0.65rem; font-style: italic; }
+
+    /* ===== MAIN INFO BAR ===== */
+    .info { display: flex; align-items: center; gap: 20px; margin-top: 10px; font-size: 0.95rem; }
+    .info div { display: flex; align-items: center; gap: 4px; }
+    .info span { color: #00d4aa; font-weight: bold; font-size: 1.2rem; }
+    .info .level-display { color: #ffd700; }
+    #startBtn { margin-top: 10px; padding: 8px 28px; background-color: #00d4aa; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; color: #1a1a2e; font-weight: bold; transition: all 0.2s; }
+    #startBtn:hover { background-color: #00ffcc; transform: scale(1.05); box-shadow: 0 0 15px rgba(0,255,204,0.4); }
+    .hint { margin-top: 8px; font-size: 0.8rem; color: #555; text-align: center; max-width: 420px; line-height: 1.4; }
+    .back { position: fixed; top: 12px; left: 12px; color: #666; text-decoration: none; font-size: 0.85rem; z-index: 50; }
+    .back:hover { color: #00d4aa; }
+
+    #gameCanvas { border: 3px solid #00d4aa; background-color: #0f3460; border-radius: 4px; box-shadow: 0 0 20px rgba(0,212,170,0.2); display: block; }
+
+    /* ===== LEVEL OVERLAY ===== */
+    .level-overlay {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15,52,96,0.95); display: none;
+      flex-direction: column; align-items: center; justify-content: center;
+      border-radius: 4px; z-index: 20;
+    }
+    .level-overlay.active { display: flex; animation: fadeIn 0.3s; }
+    .level-overlay .level-num { font-size: 2.5rem; color: #ffd700; font-weight: bold; text-shadow: 0 0 20px rgba(255,215,0,0.6); }
+    .level-overlay .level-name { font-size: 1.2rem; color: #00d4aa; margin-top: 8px; }
+    .level-overlay .level-desc { font-size: 0.85rem; color: #888; margin-top: 6px; }
+
+    /* ===== UPGRADE PANEL ===== */
+    .upgrade-overlay {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(10,10,20,0.85); display: none;
+      flex-direction: column; align-items: center; justify-content: center;
+      border-radius: 4px; z-index: 30; backdrop-filter: blur(4px);
+    }
+    .upgrade-overlay.active { display: flex; animation: fadeIn 0.2s; }
+    .upgrade-title { font-size: 1.3rem; color: #ffd700; margin-bottom: 16px; font-weight: bold; }
+    .upgrade-options { display: flex; flex-direction: column; gap: 10px; width: 320px; }
+    .upgrade-card {
+      background: rgba(15,52,96,0.9); border: 2px solid rgba(0,212,170,0.3);
+      border-radius: 10px; padding: 14px 18px; cursor: pointer;
+      transition: all 0.2s; display: flex; align-items: center; gap: 12px;
+    }
+    .upgrade-card:hover { border-color: #00d4aa; transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,212,170,0.2); }
+    .upgrade-card .icon { font-size: 1.5rem; width: 36px; text-align: center; }
+    .upgrade-card .text { flex: 1; }
+    .upgrade-card .name { font-size: 0.95rem; color: #eee; font-weight: 600; }
+    .upgrade-card .desc { font-size: 0.75rem; color: #888; margin-top: 2px; }
+    .upgrade-card .current { font-size: 0.7rem; color: #ffd700; margin-top: 1px; }
+
+    /* ===== TOAST ===== */
+    .toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 100; }
+    .toast {
+      background: rgba(0,212,170,0.2); border: 1px solid rgba(0,212,170,0.4);
+      border-radius: 6px; padding: 6px 16px; font-size: 0.85rem; color: #00d4aa;
+      animation: toastIn 0.3s, toastOut 0.3s 1.5s forwards; white-space: nowrap;
+    }
+    .toast.item-toast { background: rgba(255,215,0,0.15); border-color: rgba(255,215,0,0.3); color: #ffd700; }
+    .toast.danger-toast { background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.3); color: #ff6b6b; }
+    .toast.shield-toast { background: rgba(100,180,255,0.2); border-color: rgba(100,180,255,0.4); color: #64b4ff; }
+
+    /* ===== GAME OVER ===== */
+    .gameover-overlay {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(10,10,20,0.9); display: none;
+      flex-direction: column; align-items: center; justify-content: center;
+      border-radius: 4px; z-index: 40;
+    }
+    .gameover-overlay.active { display: flex; animation: fadeIn 0.3s; }
+    .gameover-overlay .title { font-size: 2rem; color: #ff6b6b; font-weight: bold; }
+    .gameover-overlay .final-score { font-size: 1.1rem; color: #eee; margin-top: 10px; }
+    .gameover-overlay .stats { font-size: 0.85rem; color: #888; margin-top: 6px; }
+    .gameover-overlay button {
+      margin-top: 18px; padding: 10px 32px; background-color: #00d4aa; border: none;
+      border-radius: 8px; font-size: 1rem; cursor: pointer; color: #1a1a2e; font-weight: bold;
+    }
+    .gameover-overlay button:hover { background-color: #00ffcc; transform: scale(1.05); }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+    @media (max-width: 700px) {
+      .status-panel { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <a href="https://wenhao200.github.io/" class="back">&#8592; 返回主页</a>
+  <h1>贪吃蛇 Roguelike</h1>
+  <div class="game-wrapper" id="gameWrapper">
+    <div class="status-panel" id="statusPanel">
+      <div class="stats-row">
+        <div class="stat-row"><span class="label">速度</span><span class="value accent" id="statSpeed">150ms</span></div>
+        <div class="stat-row"><span class="label">磁力</span><span class="value" id="statMagnet">0格</span></div>
+        <div class="stat-row"><span class="label">倍率</span><span class="value gold" id="statMulti">x1</span></div>
+        <div class="stat-row"><span class="label">每食物</span><span class="value" id="statPerFood">1</span></div>
+        <div class="stat-row"><span class="label">护盾</span><span class="value" id="statShield" style="color:#64b4ff;">0</span></div>
+        <div class="stat-row"><span class="label">长度</span><span class="value" id="statLength">3</span></div>
+        <div class="stat-row"><span class="label">穿墙</span><span class="value" id="statNowall">关</span></div>
+      </div>
+      <hr class="stat-divider">
+      <div class="buffs-section">
+        <h4>增益效果</h4>
+        <div class="buff-list" id="buffList"><span class="no-buffs">暂无</span></div>
+      </div>
+      <hr class="stat-divider">
+      <div class="buffs-section">
+        <h4>临时效果</h4>
+        <div class="buff-list" id="effectList"><span class="no-buffs">暂无</span></div>
+      </div>
+    </div>
+
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+    <div class="level-overlay" id="levelOverlay">
+      <div class="level-num" id="levelNum"></div>
+      <div class="level-name" id="levelName"></div>
+      <div class="level-desc" id="levelDesc"></div>
+    </div>
+    <div class="upgrade-overlay" id="upgradeOverlay">
+      <div class="upgrade-title">选择一个升级</div>
+      <div class="upgrade-options" id="upgradeOptions"></div>
+    </div>
+    <div class="gameover-overlay" id="gameoverOverlay">
+      <div class="title">游戏结束</div>
+      <div class="final-score" id="finalScore"></div>
+      <div class="stats" id="finalStats"></div>
+      <button onclick="startGame()">再来一局</button>
+    </div>
+  </div>
+
+  <div class="info">
+    <div>分数：<span id="score">0</span></div>
+    <div>关卡：<span class="level-display" id="level">1</span></div>
+    <div>食物：<span id="foodCount">0</span></div>
+    <div>最高分：<span id="highScore">0</span></div>
+  </div>
+  <button id="startBtn" onclick="startGame()">开始游戏</button>
+  <p class="hint">方向键 / WASD 控制 | 每 3 个食物触发升级 | 场上随机刷新道具</p>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    // ===== CONSTANTS =====
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const CELL = 20;
+    const COLS = canvas.width / CELL;
+    const ROWS = canvas.height / CELL;
+
+    // ===== SKILL DEFINITIONS =====
+    const SKILLS = [
+      { id: 'speed', icon: '🏃', name: '疾风步', desc: '移动速度 +20%', maxStack: 3 },
+      { id: 'magnet', icon: '🧲', name: '磁力场', desc: '食物吸引范围 +1 格', maxStack: 3 },
+      { id: 'double', icon: '💰', name: '黄金猎手', desc: '得分倍率 x1', maxStack: 2 },
+      { id: 'shield', icon: '🛡️', name: '守护', desc: '获得 1 层护盾', maxStack: 3 },
+      { id: 'clone', icon: '🐍', name: '分身术', desc: '缩短 2 节，分数 x1.5', maxStack: 99 },
+      { id: 'gluttony', icon: '🌟', name: '暴食', desc: '吃食物额外增长 2 节', maxStack: 2 },
+      { id: 'foresight', icon: '🔮', name: '预知', desc: '显示下一个食物位置', maxStack: 1 },
+      { id: 'slowtime', icon: '⏪', name: '时间减速', desc: '吃食物后减速 1.5 秒', maxStack: 2 },
+      { id: 'diamond', icon: '💎', name: '钻石体质', desc: '每个食物基础 +3 分', maxStack: 99 },
+      { id: 'reverse_ctrl', icon: '🎯', name: '精准打击', desc: '反向操控 5 个食物', maxStack: 1 },
+      { id: 'nowall', icon: '🌀', name: '空间折叠', desc: '可穿越墙壁', maxStack: 1 },
+      { id: 'lucky', icon: '🍀', name: '幸运星', desc: '道具出现率 +30%', maxStack: 2 },
+    ];
+
+    // ===== ITEM DEFINITIONS =====
+    const ITEM_DEFS = [
+      { id: 'lightning', icon: '⚡', name: '闪电', color: '#ffd700', desc: '瞬移到食物位置' },
+      { id: 'bomb', icon: '💣', name: '炸弹', color: '#ff6b6b', desc: '缩短蛇身 3 节 +5分' },
+      { id: 'freeze', icon: '❄️', name: '冰冻', color: '#87ceeb', desc: '障碍物冻结 5 秒' },
+      { id: 'key', icon: '🔑', name: '钥匙', color: '#ffd700', desc: '触发一次升级' },
+      { id: 'dice', icon: '🎲', name: '骰子', color: '#c084fc', desc: '随机技能 10 秒' },
+      { id: 'trophy', icon: '🏆', name: '奖杯', color: '#ffd700', desc: '直接 +10 分' },
+      { id: 'skull', icon: '💀', name: '骷髅', color: '#ff6b6b', desc: '蛇身头尾反转' },
+    ];
+
+    // ===== LEVEL DEFINITIONS =====
+    const LEVELS = [
+      { minScore: 0,  name: '入门试炼', desc: '简单模式，熟悉操作', speed: 150, obstacles: 0, moving: 0, boss: false },
+      { minScore: 15, name: '石墙迷宫', desc: '固定障碍物出现', speed: 140, obstacles: 6, moving: 0, boss: false },
+      { minScore: 30, name: '暗影巡逻', desc: '移动障碍物出没', speed: 130, obstacles: 4, moving: 2, boss: false },
+      { minScore: 45, name: 'Boss 降临', desc: '追踪型 Boss 出现！', speed: 120, obstacles: 3, moving: 1, boss: true },
+    ];
+
+    // ===== GAME STATE =====
+    let snake, food, nextFoodPos, direction, nextDirection, score, timer, gameRunning, paused;
+    let foodEaten, currentLevel, buffs, items, obstacles, movingObs, boss;
+    let baseSpeed;
+    let reverseCtrlRemaining;
+    let itemSpawnTimer, itemDespawnTimers;
+    let freezeEndTime; // timestamp when freeze ends
+    let slowEndTime;   // timestamp when slow ends
+    let bossHP, foodSinceBoss;
+    let animFrame;
+    let diceTimers; // track dice temporary buffs
+    let shieldFlashTimer; // timestamp for shield flash effect
+
+    // ===== UI ELEMENTS =====
+    const scoreEl = document.getElementById('score');
+    const levelEl = document.getElementById('level');
+    const foodCountEl = document.getElementById('foodCount');
+    const highScoreEl = document.getElementById('highScore');
+    const levelOverlay = document.getElementById('levelOverlay');
+    const levelNum = document.getElementById('levelNum');
+    const levelName = document.getElementById('levelName');
+    const levelDesc = document.getElementById('levelDesc');
+    const upgradeOverlay = document.getElementById('upgradeOverlay');
+    const upgradeOptions = document.getElementById('upgradeOptions');
+    const gameoverOverlay = document.getElementById('gameoverOverlay');
+    const finalScoreEl = document.getElementById('finalScore');
+    const finalStatsEl = document.getElementById('finalStats');
+    const toastContainer = document.getElementById('toastContainer');
+
+    // Status panel elements
+    const statSpeed = document.getElementById('statSpeed');
+    const statMagnet = document.getElementById('statMagnet');
+    const statMulti = document.getElementById('statMulti');
+    const statPerFood = document.getElementById('statPerFood');
+    const statShield = document.getElementById('statShield');
+    const statLength = document.getElementById('statLength');
+    const statNowall = document.getElementById('statNowall');
+    const buffList = document.getElementById('buffList');
+    const effectList = document.getElementById('effectList');
+
+    // ===== HELPERS =====
+    function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    function isOccupied(x, y) {
+      if (snake && snake.some(s => s.x === x && s.y === y)) return true;
+      if (obstacles && obstacles.some(o => o.x === x && o.y === y)) return true;
+      if (movingObs && movingObs.some(o => o.x === x && o.y === y)) return true;
+      if (boss && boss.alive && x >= boss.x && x < boss.x + 2 && y >= boss.y && y < boss.y + 2) return true;
+      if (items && items.some(i => i.x === x && i.y === y)) return true;
+      return false;
+    }
+
+    function findFreeCell(margin = 0) {
+      // First try within margin (away from walls)
+      if (margin > 0) {
+        for (let attempts = 0; attempts < 200; attempts++) {
+          const x = rand(margin, COLS - 1 - margin);
+          const y = rand(margin, ROWS - 1 - margin);
+          if (!isOccupied(x, y) && !(food && food.x === x && food.y === y)) return { x, y };
+        }
+      }
+      // Fallback: search anywhere
+      let attempts = 0;
+      while (attempts < 500) {
+        const x = rand(0, COLS - 1), y = rand(0, ROWS - 1);
+        if (!isOccupied(x, y) && !(food && food.x === x && food.y === y)) return { x, y };
+        attempts++;
+      }
+      return { x: 0, y: 0 };
+    }
+
+    function showToast(text, type = '') {
+      const el = document.createElement('div');
+      el.className = 'toast' + (type ? ' ' + type : '');
+      el.textContent = text;
+      toastContainer.appendChild(el);
+      setTimeout(() => el.remove(), 2000);
+    }
+
+    function getBuffCount(id) {
+      const b = buffs.find(b => b.id === id);
+      return b ? b.count : 0;
+    }
+
+    function addBuff(id, count = 1) {
+      const skill = SKILLS.find(s => s.id === id);
+      if (!skill) return;
+      let b = buffs.find(b => b.id === id);
+      if (b) {
+        b.count = Math.min(b.count + count, skill.maxStack);
+      } else {
+        buffs.push({ id, count: Math.min(count, skill.maxStack) });
+      }
+      refreshStatusPanel();
+    }
+
+    function removeBuff(id, count = 1) {
+      const b = buffs.find(b => b.id === id);
+      if (!b) return;
+      b.count -= count;
+      if (b.count <= 0) buffs = buffs.filter(b => b.id !== id);
+      refreshStatusPanel();
+    }
+
+    function isFrozen() { return freezeEndTime && Date.now() < freezeEndTime; }
+    function isSlowed() { return slowEndTime && Date.now() < slowEndTime; }
+
+    function getScoreMultiplier() { return 1 + getBuffCount('double'); }
+    function getScorePerFood() { return getBuffCount('diamond') > 0 ? 3 : 1; }
+    function getMagnetRange() { return getBuffCount('magnet'); }
+
+    function getSpeed() {
+      let speed = baseSpeed;
+      speed = Math.round(speed * Math.pow(0.8, getBuffCount('speed')));
+      if (isSlowed()) speed = Math.round(speed * 1.5); // slower = bigger interval
+      return Math.max(60, Math.min(300, speed));
+    }
+
+    function getLevelForScore(s) {
+      for (let i = LEVELS.length - 1; i >= 0; i--) {
+        if (s >= LEVELS[i].minScore) return i;
+      }
+      return 0;
+    }
+
+    // ===== STATUS PANEL =====
+    function refreshStatusPanel() {
+      const spd = getSpeed();
+      statSpeed.textContent = spd + 'ms';
+      statMagnet.textContent = getMagnetRange() + ' 格';
+      statMulti.textContent = 'x' + getScoreMultiplier();
+      statPerFood.textContent = getScorePerFood();
+      statShield.textContent = getBuffCount('shield');
+      statLength.textContent = snake ? snake.length : 3;
+      statNowall.textContent = getBuffCount('nowall') > 0 ? '开' : '关';
+      statNowall.style.color = getBuffCount('nowall') > 0 ? '#00d4aa' : '#888';
+
+      // Permanent buffs
+      buffList.innerHTML = '';
+      const activeBuffs = buffs.filter(b => b.count > 0);
+      if (activeBuffs.length === 0) {
+        buffList.innerHTML = '<span class="no-buffs">暂无</span>';
+      } else {
+        activeBuffs.forEach(b => {
+          const skill = SKILLS.find(s => s.id === b.id);
+          if (!skill) return;
+          const el = document.createElement('span');
+          el.className = 'buff-tag';
+          el.innerHTML = skill.icon + ' ' + (b.count > 1 ? '<span class="cnt">x' + b.count + '</span>' : '');
+          el.title = skill.name + (b.count > 1 ? ' x' + b.count : '');
+          buffList.appendChild(el);
+        });
+      }
+
+      // Temporary effects
+      effectList.innerHTML = '';
+      let hasEffect = false;
+      if (isFrozen()) {
+        const el = document.createElement('span');
+        el.className = 'effect-tag';
+        el.innerHTML = '❄️ 冻结';
+        effectList.appendChild(el);
+        hasEffect = true;
+      }
+      if (isSlowed()) {
+        const el = document.createElement('span');
+        el.className = 'effect-tag';
+        el.innerHTML = '⏪ 减速';
+        effectList.appendChild(el);
+        hasEffect = true;
+      }
+      if (reverseCtrlRemaining > 0) {
+        const el = document.createElement('span');
+        el.className = 'effect-tag';
+        el.innerHTML = '🎯 反向 (' + reverseCtrlRemaining + ')';
+        effectList.appendChild(el);
+        hasEffect = true;
+      }
+      if (!hasEffect) {
+        effectList.innerHTML = '<span class="no-buffs">暂无</span>';
+      }
+    }
+
+    // ===== GAME INIT =====
+    function startGame() {
+      clearInterval(timer);
+      clearTimeout(itemSpawnTimer);
+      cancelAnimationFrame(animFrame);
+      (itemDespawnTimers || []).forEach(t => clearTimeout(t));
+      (diceTimers || []).forEach(t => clearTimeout(t));
+
+      gameoverOverlay.classList.remove('active');
+      upgradeOverlay.classList.remove('active');
+      levelOverlay.classList.remove('active');
+
+      snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+      direction = { x: 1, y: 0 };
+      nextDirection = { x: 1, y: 0 };
+      score = 0; foodEaten = 0; currentLevel = 0;
+      buffs = []; items = []; obstacles = []; movingObs = [];
+      boss = null; baseSpeed = LEVELS[0].speed;
+      reverseCtrlRemaining = 0;
+      freezeEndTime = 0; slowEndTime = 0;
+      itemSpawnTimer = 0; itemDespawnTimers = []; diceTimers = [];
+      bossHP = 0; foodSinceBoss = 0; nextFoodPos = null;
+      paused = false; gameRunning = true;
+      shieldFlashTimer = 0;
+
+      // Start with 1 shield
+      addBuff('shield', 1);
+
+      scoreEl.textContent = '0';
+      levelEl.textContent = '1';
+      foodCountEl.textContent = '0';
+      refreshStatusPanel();
+      spawnFood();
+      spawnObstacles();
+      scheduleNextItem();
+
+      timer = setInterval(gameLoop, baseSpeed);
+      renderLoop();
+    }
+
+    // ===== FOOD =====
+    function spawnFood() {
+      food = findFreeCell(2); // keep food away from walls by 2 cells
+      if (getBuffCount('foresight') > 0) {
+        nextFoodPos = findFreeCell(2);
+      } else {
+        nextFoodPos = null;
+      }
+    }
+
+    // ===== OBSTACLES =====
+    function spawnObstacles() {
+      obstacles = [];
+      movingObs = [];
+      boss = null;
+      const lvl = LEVELS[currentLevel];
+
+      for (let i = 0; i < lvl.obstacles; i++) {
+        const pos = findFreeCell();
+        obstacles.push(pos);
+      }
+      for (let i = 0; i < lvl.moving; i++) {
+        const pos = findFreeCell();
+        movingObs.push({ x: pos.x, y: pos.y, dx: (Math.random()>0.5?1:-1), dy: (Math.random()>0.5?1:-1) });
+      }
+      if (lvl.boss) {
+        const pos = findFreeCell();
+        boss = { x: pos.x, y: pos.y, alive: true, moveAccum: 0, moveInterval: 250 };
+        bossHP = 5;
+        foodSinceBoss = 0;
+      }
+    }
+
+    // ===== ITEMS =====
+    function scheduleNextItem() {
+      if (!gameRunning) return;
+      const delay = rand(5000, 9000) / Math.pow(1.3, getBuffCount('lucky'));
+      itemSpawnTimer = setTimeout(() => {
+        if (gameRunning && !paused) spawnItem();
+        if (gameRunning) scheduleNextItem();
+      }, delay);
+    }
+
+    function spawnItem() {
+      if (items.length >= 2) return;
+      const def = ITEM_DEFS[rand(0, ITEM_DEFS.length - 1)];
+      const pos = findFreeCell();
+      const item = { ...pos, ...def, spawnTime: Date.now() };
+      items.push(item);
+      const tid = setTimeout(() => {
+        const idx = items.indexOf(item);
+        if (idx >= 0) items.splice(idx, 1);
+      }, 12000);
+      itemDespawnTimers.push(tid);
+    }
+
+    // ===== GAME LOOP =====
+    function gameLoop() {
+      if (!gameRunning || paused) return;
+
+      // Apply queued direction
+      direction = { ...nextDirection };
+
+      // Recalculate speed (may change due to slowtime)
+      clearInterval(timer);
+      timer = setInterval(gameLoop, getSpeed());
+
+      update();
+    }
+
+    function update() {
+      const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+      // Nowall wrap
+      const hasNowall = getBuffCount('nowall') > 0;
+      if (hasNowall) {
+        if (head.x < 0) head.x = COLS - 1;
+        if (head.x >= COLS) head.x = 0;
+        if (head.y < 0) head.y = ROWS - 1;
+        if (head.y >= ROWS) head.y = 0;
+      }
+
+      // Collision checks
+      const wallHit = !hasNowall && (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS);
+      const selfHit = snake.some(s => s.x === head.x && s.y === head.y);
+      const obstacleHit = obstacles.some(o => o.x === head.x && o.y === head.y);
+      const movingHit = movingObs.some(o => o.x === head.x && o.y === head.y);
+      let bossHit = false;
+      if (boss && boss.alive) {
+        bossHit = head.x >= boss.x && head.x < boss.x + 2 && head.y >= boss.y && head.y < boss.y + 2;
+      }
+
+      if (wallHit || selfHit || obstacleHit || movingHit || bossHit) {
+        // SHIELD: consume one, redirect snake to safe direction
+        if (getBuffCount('shield') > 0) {
+          removeBuff('shield', 1);
+          // Pick a new safe direction (not the opposite of current to avoid self-collision)
+          const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}]
+            .filter(d => !(d.x === -direction.x && d.y === -direction.y));
+          const newDir = dirs[Math.floor(Math.random() * dirs.length)];
+          direction = { ...newDir };
+          nextDirection = { ...newDir };
+          // Trigger flash effect
+          shieldFlashTimer = Date.now() + 350;
+          let reason = '撞墙';
+          if (selfHit) reason = '撞自身';
+          if (obstacleHit) reason = '撞障碍';
+          if (movingHit) reason = '撞巡逻';
+          if (bossHit) reason = '撞Boss';
+          showToast('🛡️ 护盾抵挡了' + reason + '！方向已调整', 'shield-toast');
+          return;
+        }
+        gameOver();
+        return;
+      }
+
+      // Magnet: if food within range, food moves 1 step toward snake head
+      const magnetRange = getMagnetRange();
+      if (magnetRange > 0 && food) {
+        const dist = Math.abs(snake[0].x - food.x) + Math.abs(snake[0].y - food.y);
+        if (dist <= magnetRange + 1) {
+          // Move food 1 cell closer to snake head per tick
+          const fx = food.x + Math.sign(snake[0].x - food.x);
+          const fy = food.y + Math.sign(snake[0].y - food.y);
+          if (fx >= 0 && fx < COLS && fy >= 0 && fy < ROWS && !isOccupied(fx, fy)) {
+            food.x = fx;
+            food.y = fy;
+          }
+        }
+      }
+
+      // Move snake forward
+      snake.unshift(head);
+
+      // Check food pickup
+      let ate = false;
+      if (food && head.x === food.x && head.y === food.y) {
+        ate = true;
+        foodEaten++;
+        foodCountEl.textContent = foodEaten;
+
+        // Calculate score
+        const perFood = getScorePerFood();
+        const multi = getScoreMultiplier();
+        let gained = perFood * multi;
+        // Clone bonus: +50% score
+        if (getBuffCount('clone') > 0) gained = Math.floor(gained * 1.5);
+        score += gained;
+        scoreEl.textContent = score;
+
+        // Gluttony: extra body segments
+        for (let i = 0; i < getBuffCount('gluttony'); i++) {
+          snake.push({ ...snake[snake.length - 1] });
+        }
+
+        // Reverse control countdown
+        if (reverseCtrlRemaining > 0) {
+          reverseCtrlRemaining--;
+          if (reverseCtrlRemaining === 0) {
+            showToast('🎯 反向操控已结束');
+          }
+        }
+
+        // Slow time: activate on food eat
+        if (getBuffCount('slowtime') > 0) {
+          slowEndTime = Date.now() + 1500;
+        }
+
+        // Boss tracking
+        if (boss && boss.alive) {
+          foodSinceBoss++;
+          if (foodSinceBoss >= bossHP) defeatBoss();
+        }
+
+        // Check level up
+        const newLvl = getLevelForScore(score);
+        if (newLvl > currentLevel) {
+          triggerLevelUp(newLvl);
+        }
+
+        // Check upgrade (every 3 food)
+        if (foodEaten % 3 === 0) {
+          triggerUpgrade();
+        }
+
+        spawnFood();
+      }
+
+      if (!ate) {
+        snake.pop(); // Remove tail if didn't eat
+      }
+
+      // Check item pickup (after snake moved)
+      checkItemPickup(head);
+
+      // Update moving obstacles
+      if (!isFrozen()) {
+        movingObs.forEach(o => {
+          let nx = o.x + o.dx, ny = o.y + o.dy;
+          if (nx < 0 || nx >= COLS) { o.dx = -o.dx; nx = o.x + o.dx; }
+          if (ny < 0 || ny >= ROWS) { o.dy = -o.dy; ny = o.y + o.dy; }
+          if (!snake.some(s => s.x === nx && s.y === ny) && !obstacles.some(ob => ob.x === nx && ob.y === ny)) {
+            o.x = nx; o.y = ny;
+          } else {
+            o.dx = -o.dx; o.dy = -o.dy;
+          }
+        });
+      }
+
+      // Update boss
+      if (boss && boss.alive && !isFrozen()) {
+        boss.moveAccum += getSpeed();
+        if (boss.moveAccum >= boss.moveInterval) {
+          boss.moveAccum = 0;
+          const dx = snake[0].x > boss.x ? 1 : (snake[0].x + 1 < boss.x ? -1 : 0);
+          const dy = snake[0].y > boss.y ? 1 : (snake[0].y + 1 < boss.y ? -1 : 0);
+          const bx = boss.x + dx, by = boss.y + dy;
+          if (bx >= 0 && bx + 1 < COLS && by >= 0 && by + 1 < ROWS &&
+              !obstacles.some(o => o.x === bx && o.y === by) &&
+              !snake.some(s => s.x >= bx && s.x < bx+2 && s.y >= by && s.y < by+2)) {
+            boss.x = bx; boss.y = by;
+          }
+        }
+      }
+
+      // Clean up expired effects
+      if (freezeEndTime && !isFrozen()) {
+        freezeEndTime = 0;
+      }
+      if (slowEndTime && !isSlowed()) {
+        slowEndTime = 0;
+      }
+
+      refreshStatusPanel();
+    }
+
+    function checkItemPickup(head) {
+      const remaining = [];
+      items.forEach(item => {
+        if (item.x === head.x && item.y === head.y) {
+          applyItem(item);
+        } else {
+          remaining.push(item);
+        }
+      });
+      items = remaining;
+    }
+
+    // ===== ITEM EFFECTS =====
+    function applyItem(item) {
+      showToast(`${item.icon} ${item.name} — ${item.desc}`, (item.id === 'skull' || item.id === 'bomb') ? 'danger-toast' : 'item-toast');
+      switch (item.id) {
+        case 'lightning':
+          if (food) { snake[0] = { x: food.x, y: food.y }; }
+          showToast('⚡ 瞬移到食物位置！', 'item-toast');
+          break;
+        case 'bomb':
+          const cut = Math.min(3, snake.length - 3);
+          if (cut > 0) {
+            for (let i = 0; i < cut; i++) snake.pop();
+            showToast(`💣 炸弹！蛇身缩短 ${cut} 节`, 'danger-toast');
+          } else {
+            showToast('💣 炸弹！但蛇已经最短了', 'danger-toast');
+          }
+          score += 5; scoreEl.textContent = score;
+          break;
+        case 'freeze':
+          freezeEndTime = Date.now() + 5000;
+          showToast('❄️ 障碍物已冻结 5 秒！', 'item-toast');
+          break;
+        case 'key':
+          triggerUpgrade();
+          break;
+        case 'dice': {
+          const randomSkill = SKILLS[rand(0, SKILLS.length - 1)];
+          addBuff(randomSkill.id, 1);
+          showToast(`${randomSkill.icon} 骰子！临时获得 ${randomSkill.name}`, 'item-toast');
+          const tid = setTimeout(() => {
+            removeBuff(randomSkill.id, 1);
+            showToast(`${randomSkill.icon} ${randomSkill.name} 效果已消退`);
+          }, 10000);
+          diceTimers.push(tid);
+          break;
+        }
+        case 'trophy':
+          score += 10; scoreEl.textContent = score;
+          showToast('🏆 +10 分！', 'item-toast');
+          break;
+        case 'skull':
+          snake.reverse();
+          direction = { x: -direction.x, y: -direction.y };
+          nextDirection = { ...direction };
+          showToast('💀 蛇身反转！方向也反转了', 'danger-toast');
+          break;
+      }
+      refreshStatusPanel();
+    }
+
+    // ===== LEVEL UP =====
+    function triggerLevelUp(newLvl) {
+      currentLevel = newLvl;
+      const lvl = LEVELS[currentLevel];
+      baseSpeed = lvl.speed;
+      levelEl.textContent = currentLevel + 1;
+
+      levelNum.textContent = `第 ${currentLevel + 1} 关`;
+      levelName.textContent = lvl.name;
+      levelDesc.textContent = lvl.desc;
+      levelOverlay.classList.add('active');
+      paused = true;
+      clearInterval(timer);
+
+      setTimeout(() => {
+        levelOverlay.classList.remove('active');
+        paused = false;
+        spawnObstacles();
+        // Remove obstacles that overlap with snake
+        obstacles = obstacles.filter(o => !snake.some(s => s.x === o.x && s.y === o.y));
+        movingObs.forEach(o => {
+          if (snake.some(s => s.x === o.x && s.y === o.y)) {
+            const pos = findFreeCell();
+            o.x = pos.x; o.y = pos.y;
+          }
+        });
+        timer = setInterval(gameLoop, getSpeed());
+      }, 2000);
+    }
+
+    // ===== UPGRADE =====
+    function triggerUpgrade() {
+      paused = true;
+      const available = SKILLS.filter(s => getBuffCount(s.id) < s.maxStack);
+      // Shuffle
+      for (let i = available.length - 1; i > 0; i--) {
+        const j = rand(0, i);
+        [available[i], available[j]] = [available[j], available[i]];
+      }
+      const choices = available.slice(0, Math.min(3, available.length));
+
+      upgradeOptions.innerHTML = '';
+      choices.forEach(skill => {
+        const card = document.createElement('div');
+        card.className = 'upgrade-card';
+        const currentCount = getBuffCount(skill.id);
+        card.innerHTML = `
+          <div class="icon">${skill.icon}</div>
+          <div class="text">
+            <div class="name">${skill.name}</div>
+            <div class="desc">${skill.desc}</div>
+            ${currentCount > 0 ? '<div class="current">当前层数: ' + currentCount + (skill.maxStack < 99 ? ' / ' + skill.maxStack : '') + '</div>' : ''}
+          </div>
+        `;
+        card.onclick = () => selectUpgrade(skill);
+        upgradeOptions.appendChild(card);
+      });
+
+      if (choices.length === 0) {
+        paused = false;
+        return;
+      }
+      upgradeOverlay.classList.add('active');
+    }
+
+    function selectUpgrade(skill) {
+      addBuff(skill.id, 1);
+      showToast(`${skill.icon} 获得了 ${skill.name}！`);
+      upgradeOverlay.classList.remove('active');
+      paused = false;
+    }
+
+    // ===== BOSS =====
+    function defeatBoss() {
+      if (!boss || !boss.alive) return;
+      boss.alive = false;
+      score += 20; scoreEl.textContent = score;
+      showToast('🏆 击败 Boss！+20 分！', 'item-toast');
+    }
+
+    // ===== GAME OVER =====
+    function gameOver() {
+      gameRunning = false;
+      clearInterval(timer);
+      clearTimeout(itemSpawnTimer);
+      (itemDespawnTimers || []).forEach(t => clearTimeout(t));
+
+      if (score > parseInt(highScoreEl.textContent || '0')) {
+        highScoreEl.textContent = score;
+        try { localStorage.setItem('snakeRoguelikeHigh', score); } catch(e) {}
+      }
+
+      finalScoreEl.textContent = `最终得分：${score}`;
+      finalStatsEl.textContent = `关卡 ${currentLevel + 1} | 吃了 ${foodEaten} 个食物 | 蛇长 ${snake.length}`;
+      gameoverOverlay.classList.add('active');
+    }
+
+    // ===== RENDERING =====
+    function renderLoop() {
+      draw();
+      animFrame = requestAnimationFrame(renderLoop);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Grid
+      ctx.strokeStyle = 'rgba(0,212,170,0.04)';
+      ctx.lineWidth = 0.5;
+      for (let x = 0; x <= COLS; x++) {
+        ctx.beginPath(); ctx.moveTo(x*CELL, 0); ctx.lineTo(x*CELL, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y <= ROWS; y++) {
+        ctx.beginPath(); ctx.moveTo(0, y*CELL); ctx.lineTo(canvas.width, y*CELL); ctx.stroke();
+      }
+
+      // Obstacles
+      ctx.fillStyle = '#4a5568';
+      ctx.shadowColor = 'rgba(0,0,0,0.3)';
+      ctx.shadowBlur = 4;
+      obstacles.forEach(o => {
+        ctx.fillRect(o.x*CELL+1, o.y*CELL+1, CELL-2, CELL-2);
+      });
+      ctx.shadowBlur = 0;
+
+      // Moving obstacles
+      const frozen = isFrozen();
+      movingObs.forEach(o => {
+        ctx.fillStyle = frozen ? '#87ceeb' : '#e53e3e';
+        ctx.shadowColor = frozen ? 'rgba(135,206,235,0.5)' : 'rgba(229,62,62,0.5)';
+        ctx.shadowBlur = 6;
+        ctx.fillRect(o.x*CELL+1, o.y*CELL+1, CELL-2, CELL-2);
+        // Arrow indicator
+        ctx.fillStyle = frozen ? '#b0e0ff' : '#fff';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(frozen ? '❄' : '→', o.x*CELL+CELL/2, o.y*CELL+CELL/2);
+      });
+      ctx.shadowBlur = 0;
+
+      // Boss
+      if (boss && boss.alive) {
+        ctx.fillStyle = frozen ? '#87ceeb' : '#dc2626';
+        ctx.shadowColor = frozen ? 'rgba(135,206,235,0.6)' : 'rgba(220,38,38,0.6)';
+        ctx.shadowBlur = 12;
+        ctx.fillRect(boss.x*CELL, boss.y*CELL, CELL*2, CELL*2);
+        // Eyes
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(boss.x*CELL+5, boss.y*CELL+5, 6, 6);
+        ctx.fillRect(boss.x*CELL+CELL+9, boss.y*CELL+5, 6, 6);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(boss.x*CELL+7, boss.y*CELL+7, 3, 3);
+        ctx.fillRect(boss.x*CELL+CELL+11, boss.y*CELL+7, 3, 3);
+        ctx.shadowBlur = 0;
+        // HP bar
+        const barW = CELL*2, barH = 4, barX = boss.x*CELL, barY = boss.y*CELL-7;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(barX, barY, barW, barH);
+        const remaining = Math.max(0, bossHP - foodSinceBoss);
+        ctx.fillStyle = '#dc2626'; ctx.fillRect(barX, barY, barW*(remaining/bossHP), barH);
+        // HP text
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(remaining + '/' + bossHP, barX + barW/2, barY + barH + 8);
+      }
+
+      // Next food preview (foresight)
+      if (nextFoodPos) {
+        const pulse = Math.sin(Date.now()/300) * 0.3 + 0.5;
+        ctx.fillStyle = `rgba(0,212,170,${pulse * 0.3})`;
+        ctx.beginPath();
+        ctx.arc(nextFoodPos.x*CELL+CELL/2, nextFoodPos.y*CELL+CELL/2, CELL/2+2, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(0,212,170,${pulse * 0.7})`;
+        ctx.font = '10px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('🔮', nextFoodPos.x*CELL+CELL/2, nextFoodPos.y*CELL+CELL/2);
+      }
+
+      // Food
+      if (food) {
+        ctx.fillStyle = '#ff6b6b';
+        ctx.shadowColor = '#ff6b6b'; ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(food.x*CELL+CELL/2, food.y*CELL+CELL/2, CELL/2-2, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Items
+      const now = Date.now();
+      items.forEach(item => {
+        const age = now - item.spawnTime;
+        const pulse = Math.sin(age/200) * 0.15 + 0.85;
+        const fadeOut = age > 9000 ? Math.max(0, 1 - (age-9000)/3000) : 1;
+
+        ctx.globalAlpha = fadeOut;
+        // Background circle
+        ctx.fillStyle = item.color;
+        ctx.shadowColor = item.color; ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(item.x*CELL+CELL/2, item.y*CELL+CELL/2, CELL/2*pulse, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // Icon
+        ctx.font = `${Math.round(13*pulse)}px Arial`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(item.icon, item.x*CELL+CELL/2, item.y*CELL+CELL/2);
+        ctx.globalAlpha = 1;
+      });
+
+      // Snake
+      snake.forEach((seg, i) => {
+        const alpha = 1 - i / snake.length * 0.5;
+
+        // Shield aura on head - more layers = more rings
+        if (i === 0 && getBuffCount('shield') > 0) {
+          const shieldCount = getBuffCount('shield');
+          const cx = seg.x*CELL+CELL/2, cy = seg.y*CELL+CELL/2;
+          // Draw shield rings based on count
+          for (let s = 1; s <= shieldCount; s++) {
+            const radius = CELL/2 + s * 5;
+            const alpha = 0.15 / s; // outer rings more transparent
+            ctx.fillStyle = shieldCount >= 3
+              ? `rgba(255,215,0,${alpha * 0.3})`  // gold tint for 3 layers
+              : `rgba(100,180,255,${alpha})`;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle = shieldCount >= 3
+              ? `rgba(255,215,0,${0.5 / s})`
+              : `rgba(100,180,255,${0.6 / s})`;
+            ctx.lineWidth = shieldCount >= 3 ? 2 : 1.5;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI*2);
+            ctx.stroke();
+          }
+          // Gold glow for 3 layers
+          if (shieldCount >= 3) {
+            ctx.fillStyle = 'rgba(255,215,0,0.08)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, CELL/2+18, 0, Math.PI*2);
+            ctx.fill();
+          }
+        }
+
+        ctx.fillStyle = `rgba(0,212,170,${alpha})`;
+        const p = i === 0 ? 1 : 2, r = i === 0 ? 5 : 3;
+        ctx.beginPath();
+        ctx.moveTo(seg.x*CELL+p+r, seg.y*CELL+p);
+        ctx.lineTo(seg.x*CELL+CELL-p-r, seg.y*CELL+p);
+        ctx.quadraticCurveTo(seg.x*CELL+CELL-p, seg.y*CELL+p, seg.x*CELL+CELL-p, seg.y*CELL+p+r);
+        ctx.lineTo(seg.x*CELL+CELL-p, seg.y*CELL+CELL-p-r);
+        ctx.quadraticCurveTo(seg.x*CELL+CELL-p, seg.y*CELL+CELL-p, seg.x*CELL+CELL-p-r, seg.y*CELL+CELL-p);
+        ctx.lineTo(seg.x*CELL+p+r, seg.y*CELL+CELL-p);
+        ctx.quadraticCurveTo(seg.x*CELL+p, seg.y*CELL+CELL-p, seg.x*CELL+p, seg.y*CELL+CELL-p-r);
+        ctx.lineTo(seg.x*CELL+p, seg.y*CELL+p+r);
+        ctx.quadraticCurveTo(seg.x*CELL+p, seg.y*CELL+p, seg.x*CELL+p+r, seg.y*CELL+p);
+        ctx.fill();
+
+        // Eyes on head
+        if (i === 0) {
+          ctx.fillStyle = '#fff';
+          const cx = seg.x*CELL+CELL/2, cy = seg.y*CELL+CELL/2;
+          ctx.beginPath();
+          ctx.arc(cx + direction.x*4 - direction.y*3, cy + direction.y*4 + direction.x*3, 2.5, 0, Math.PI*2);
+          ctx.arc(cx + direction.x*4 + direction.y*3, cy + direction.y*4 - direction.x*3, 2.5, 0, Math.PI*2);
+          ctx.fill();
+          // Pupils
+          ctx.fillStyle = '#1a1a2e';
+          ctx.beginPath();
+          ctx.arc(cx + direction.x*5 - direction.y*3, cy + direction.y*5 + direction.x*3, 1.2, 0, Math.PI*2);
+          ctx.arc(cx + direction.x*5 + direction.y*3, cy + direction.y*5 - direction.x*3, 1.2, 0, Math.PI*2);
+          ctx.fill();
+        }
+      });
+
+      // Shield flash effect
+      if (shieldFlashTimer && Date.now() < shieldFlashTimer) {
+        const progress = 1 - (shieldFlashTimer - Date.now()) / 350;
+        ctx.fillStyle = `rgba(100,180,255,${0.25 * (1 - progress)})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // Overlay effects
+      if (frozen) {
+        ctx.fillStyle = 'rgba(135,206,235,0.06)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#87ceeb'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'left';
+        const freezeLeft = Math.max(0, Math.ceil((freezeEndTime - Date.now())/1000));
+        ctx.fillText('❄️ 冻结 ' + freezeLeft + 's', 6, 16);
+      }
+      if (isSlowed()) {
+        ctx.fillStyle = 'rgba(135,206,235,0.04)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#87ceeb'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'right';
+        const slowLeft = Math.max(0, ((slowEndTime - Date.now())/1000)).toFixed(1);
+        ctx.fillText('⏪ 减速 ' + slowLeft + 's', canvas.width-6, 16);
+      }
+    }
+
+    // ===== INPUT =====
+    document.addEventListener('keydown', e => {
+      if (!gameRunning || paused) {
+        // Allow start with space
+        if (e.key === ' ' && !gameRunning) startGame();
+        return;
+      }
+      let map = {
+        ArrowUp: {x:0,y:-1}, ArrowDown: {x:0,y:1}, w: {x:0,y:-1}, s: {x:0,y:1},
+        ArrowLeft: {x:-1,y:0}, ArrowRight: {x:1,y:0}, a: {x:-1,y:0}, d: {x:1,y:0}
+      };
+      if (reverseCtrlRemaining > 0) {
+        map = {
+          ArrowUp: {x:0,y:1}, ArrowDown: {x:0,y:-1}, w: {x:0,y:1}, s: {x:0,y:-1},
+          ArrowLeft: {x:1,y:0}, ArrowRight: {x:-1,y:0}, a: {x:1,y:0}, d: {x:-1,y:0}
+        };
+      }
+      const next = map[e.key];
+      if (next && !(next.x === -direction.x && next.y === -direction.y)) {
+        nextDirection = next;
+      }
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(e.key)) {
+        e.preventDefault();
+      }
+    });
+
+    // ===== MOBILE TOUCH =====
+    let touchStart = null;
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }, { passive: false });
+    canvas.addEventListener('touchend', e => {
+      if (!touchStart || !gameRunning || paused) return;
+      const dx = e.changedTouches[0].clientX - touchStart.x;
+      const dy = e.changedTouches[0].clientY - touchStart.y;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return; // too small
+      let next;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        next = dx > 0 ? {x:1,y:0} : {x:-1,y:0};
+      } else {
+        next = dy > 0 ? {x:0,y:1} : {x:0,y:-1};
+      }
+      if (reverseCtrlRemaining > 0) next = { x:-next.x, y:-next.y };
+      if (!(next.x === -direction.x && next.y === -direction.y)) nextDirection = next;
+      touchStart = null;
+    });
+
+    // ===== HIGH SCORE =====
+    try {
+      const saved = localStorage.getItem('snakeRoguelikeHigh');
+      if (saved) highScoreEl.textContent = saved;
+    } catch(e) {}
+
+    // ===== INITIAL DRAW =====
+    ctx.fillStyle = '#0f3460';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#00d4aa';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('点击「开始游戏」', canvas.width/2, canvas.height/2);
+    ctx.font = '12px Arial';
+    ctx.fillStyle = '#555';
+    ctx.fillText('每 3 个食物触发升级选择', canvas.width/2, canvas.height/2 + 24);
+  </script>
+</body>
+</html>
