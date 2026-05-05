@@ -3,83 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>贪吃蛇游戏</title>
+  <title>贪吃蛇游戏 - 王文昊</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
       background-color: #1a1a2e;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
       min-height: 100vh;
-      font-family: 'Segoe UI', Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
       color: #eee;
     }
-
-    h1 {
-      font-size: 2rem;
-      color: #00d4aa;
-      margin-bottom: 16px;
-      text-shadow: 0 0 10px rgba(0, 212, 170, 0.5);
-    }
-
-    #gameCanvas {
-      border: 3px solid #00d4aa;
-      background-color: #0f3460;
-      border-radius: 4px;
-      box-shadow: 0 0 20px rgba(0, 212, 170, 0.2);
-    }
-
-    .info {
-      display: flex;
-      align-items: center;
-      gap: 24px;
-      margin-top: 16px;
-      font-size: 1.1rem;
-    }
-
-    .info span {
-      color: #00d4aa;
-      font-weight: bold;
-      font-size: 1.3rem;
-    }
-
-    #startBtn {
-      margin-top: 16px;
-      padding: 10px 32px;
-      background-color: #00d4aa;
-      border: none;
-      border-radius: 8px;
-      font-size: 1.1rem;
-      cursor: pointer;
-      color: #1a1a2e;
-      font-weight: bold;
-      transition: all 0.2s;
-    }
-
-    #startBtn:hover {
-      background-color: #00ffcc;
-      transform: scale(1.05);
-      box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
-    }
-
-    .hint {
-      margin-top: 12px;
-      font-size: 0.85rem;
-      color: #666;
-    }
-
-    .game-over {
-      color: #ff6b6b;
-      font-size: 1.2rem;
-      margin-top: 12px;
-      display: none;
-    }
+    h1 { font-size: 2rem; color: #00d4aa; margin-bottom: 16px; text-shadow: 0 0 10px rgba(0,212,170,0.5); }
+    #gameCanvas { border: 3px solid #00d4aa; background-color: #0f3460; border-radius: 4px; box-shadow: 0 0 20px rgba(0,212,170,0.2); }
+    .info { display: flex; align-items: center; gap: 24px; margin-top: 16px; font-size: 1.1rem; }
+    .info span { color: #00d4aa; font-weight: bold; font-size: 1.3rem; }
+    #startBtn { margin-top: 16px; padding: 10px 32px; background-color: #00d4aa; border: none; border-radius: 8px; font-size: 1.1rem; cursor: pointer; color: #1a1a2e; font-weight: bold; transition: all 0.2s; }
+    #startBtn:hover { background-color: #00ffcc; transform: scale(1.05); box-shadow: 0 0 15px rgba(0,255,204,0.4); }
+    .hint { margin-top: 12px; font-size: 0.85rem; color: #666; }
+    .back { position: fixed; top: 16px; left: 16px; color: #888; text-decoration: none; font-size: 0.9rem; }
+    .back:hover { color: #00d4aa; }
+    .game-over { color: #ff6b6b; font-size: 1.2rem; margin-top: 12px; display: none; }
   </style>
 </head>
 <body>
+  <a href="https://wenhao200.github.io/" class="back">← 返回主页</a>
   <h1>🐍 贪吃蛇</h1>
   <canvas id="gameCanvas" width="400" height="400"></canvas>
   <div class="info">
@@ -87,9 +34,8 @@
     <div>最高分：<span id="highScore">0</span></div>
   </div>
   <button id="startBtn">开始游戏</button>
-  <p class="hint">使用 ↑ ↓ ← → 方向键控制</p>
+  <p class="hint">使用 ↑ ↓ ← → 方向键或 W A S D 控制</p>
   <p class="game-over" id="gameOverMsg">游戏结束！</p>
-
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -97,19 +43,12 @@
     const highScoreEl = document.getElementById('highScore');
     const startBtn = document.getElementById('startBtn');
     const gameOverMsg = document.getElementById('gameOverMsg');
-
     const CELL = 20;
     const COLS = canvas.width / CELL;
     const ROWS = canvas.height / CELL;
-
     let snake, food, direction, score, timer, gameRunning;
-
     function init() {
-      snake = [
-        { x: 10, y: 10 },
-        { x: 9, y: 10 },
-        { x: 8, y: 10 },
-      ];
+      snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
       direction = { x: 1, y: 0 };
       score = 0;
       scoreEl.textContent = 0;
@@ -118,67 +57,44 @@
       spawnFood();
       draw();
     }
-
     function spawnFood() {
       let pos;
-      do {
-        pos = {
-          x: Math.floor(Math.random() * COLS),
-          y: Math.floor(Math.random() * ROWS),
-        };
-      } while (snake.some(seg => seg.x === pos.x && seg.y === pos.y));
+      do { pos = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) }; }
+      while (snake.some(s => s.x === pos.x && s.y === pos.y));
       food = pos;
     }
-
     function update() {
       if (!gameRunning) return;
-
-      const head = {
-        x: snake[0].x + direction.x,
-        y: snake[0].y + direction.y,
-      };
-
-      if (
-        head.x < 0 || head.x >= COLS ||
-        head.y < 0 || head.y >= ROWS ||
-        snake.some(seg => seg.x === head.x && seg.y === head.y)
-      ) {
-        clearInterval(timer);
-        gameRunning = false;
-        gameOverMsg.textContent = `游戏结束！得分：${score}`;
+      const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS || snake.some(s => s.x === head.x && s.y === head.y)) {
+        clearInterval(timer); gameRunning = false;
+        gameOverMsg.textContent = '游戏结束！得分：' + score;
         gameOverMsg.style.display = 'block';
-        if (score > parseInt(highScoreEl.textContent)) {
-          highScoreEl.textContent = score;
-        }
+        if (score > parseInt(highScoreEl.textContent)) highScoreEl.textContent = score;
         return;
       }
-
       snake.unshift(head);
-
-      if (head.x === food.x && head.y === food.y) {
-        score++;
-        scoreEl.textContent = score;
-        spawnFood();
-      } else {
-        snake.pop();
-      }
-
+      if (head.x === food.x && head.y === food.y) { score++; scoreEl.textContent = score; spawnFood(); }
+      else snake.pop();
       draw();
     }
-
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // 画蛇身（渐变绿色）
       snake.forEach((seg, i) => {
-        const alpha = 1 - (i / snake.length) * 0.5;
-        ctx.fillStyle = `rgba(0, 212, 170, ${alpha})`;
-        const padding = i === 0 ? 1 : 2;
-        const radius = i === 0 ? 5 : 3;
-        roundRect(ctx, seg.x * CELL + padding, seg.y * CELL + padding, CELL - padding * 2, CELL - padding * 2, radius);
+        ctx.fillStyle = 'rgba(0,212,170,' + (1 - i / snake.length * 0.5) + ')';
+        const p = i === 0 ? 1 : 2, r = i === 0 ? 5 : 3;
+        ctx.beginPath();
+        ctx.moveTo(seg.x * CELL + p + r, seg.y * CELL + p);
+        ctx.lineTo(seg.x * CELL + CELL - p - r, seg.y * CELL + p);
+        ctx.quadraticCurveTo(seg.x * CELL + CELL - p, seg.y * CELL + p, seg.x * CELL + CELL - p, seg.y * CELL + p + r);
+        ctx.lineTo(seg.x * CELL + CELL - p, seg.y * CELL + CELL - p - r);
+        ctx.quadraticCurveTo(seg.x * CELL + CELL - p, seg.y * CELL + CELL - p, seg.x * CELL + CELL - p - r, seg.y * CELL + CELL - p);
+        ctx.lineTo(seg.x * CELL + p + r, seg.y * CELL + CELL - p);
+        ctx.quadraticCurveTo(seg.x * CELL + p, seg.y * CELL + CELL - p, seg.x * CELL + p, seg.y * CELL + CELL - p - r);
+        ctx.lineTo(seg.x * CELL + p, seg.y * CELL + p + r);
+        ctx.quadraticCurveTo(seg.x * CELL + p, seg.y * CELL + p, seg.x * CELL + p + r, seg.y * CELL + p);
+        ctx.fill();
       });
-
-      // 画食物（红色圆点）
       ctx.fillStyle = '#ff6b6b';
       ctx.shadowColor = '#ff6b6b';
       ctx.shadowBlur = 8;
@@ -187,46 +103,13 @@
       ctx.fill();
       ctx.shadowBlur = 0;
     }
-
-    function roundRect(ctx, x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.fill();
-    }
-
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', e => {
       if (!gameRunning) return;
-      const map = {
-        ArrowUp:    { x:  0, y: -1 },
-        ArrowDown:  { x:  0, y:  1 },
-        ArrowLeft:  { x: -1, y:  0 },
-        ArrowRight: { x:  1, y:  0 },
-        w: { x:  0, y: -1 },
-        s: { x:  0, y:  1 },
-        a: { x: -1, y:  0 },
-        d: { x:  1, y:  0 },
-      };
+      const map = { ArrowUp: {x:0,y:-1}, ArrowDown: {x:0,y:1}, ArrowLeft: {x:-1,y:0}, ArrowRight: {x:1,y:0}, w: {x:0,y:-1}, s: {x:0,y:1}, a: {x:-1,y:0}, d: {x:1,y:0} };
       const next = map[e.key];
-      if (next && !(next.x === -direction.x && next.y === -direction.y)) {
-        direction = next;
-      }
+      if (next && !(next.x === -direction.x && next.y === -direction.y)) direction = next;
     });
-
-    startBtn.addEventListener('click', () => {
-      clearInterval(timer);
-      init();
-      timer = setInterval(update, 150);
-    });
-
-    // 初始绘制
+    startBtn.addEventListener('click', () => { clearInterval(timer); init(); timer = setInterval(update, 150); });
     init();
   </script>
 </body>
